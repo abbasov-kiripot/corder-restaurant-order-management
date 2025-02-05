@@ -12,7 +12,6 @@ function compartOrderControlApi($url): array
     return post($url, $data);
 }
 
-//sideEffect!!!
 function post(string $url, array $data): array
 {
     $ch = curl_init($url);
@@ -27,39 +26,119 @@ function post(string $url, array $data): array
     $response = curl_exec($ch);
     curl_close($ch);
 
-    return $response = json_decode($response, true);
+    return json_decode($response, true);
 }
-
 
 function kelimeleriFormatla(string $metin, int $satirUzunlugu = 16, string $boslukKarakteri = ' '): string
 {
+    // Existing implementation remains the same
     $satirlar = [];
-
-    // İlk 16 karakteri al
     $ilkSatir = mb_substr($metin, 0, $satirUzunlugu);
     $satirlar[] = $ilkSatir;
-
-    // Geri kalan metni işle
     $geriKalanMetin = mb_substr($metin, $satirUzunlugu);
 
-    // Metindeki her karakter için işlem yap
     for ($i = 0; $i < mb_strlen($geriKalanMetin); $i++) {
-        // Eğer mevcut satır uzunluğuna ulaşıldıysa
         if (($i % $satirUzunlugu) === 0) {
-            // 21 karakter boşluk ekle ve satıra ekle
             $satirlar[] = str_repeat($boslukKarakteri, 21);
         }
-
-        // Karakteri ekle
         $satirlar[count($satirlar) - 1] .= $geriKalanMetin[$i];
     }
-    // Son satıra bir alt satıra geçiş karakteri ekle
     $satirlar[count($satirlar) - 1] .= "\n";
 
-    // Satırları birleştirerek döndür
     return implode(PHP_EOL, $satirlar);
 }
 
+function writeToFile($fileName, $content) {
+    $file = fopen($fileName, 'w');
+    if ($file === false) {
+        die("Unable to create file: $fileName");
+    }
+    fwrite($file, $content);
+    fclose($file);
+}
+
+function formatOrderContent($data, $index) {
+    // Existing implementation remains the same
+    $unixTimestamp = strtotime($data['order_time']);
+    $orderNote = "NOT: " . $data['order_note'] . "\n\n";
+
+    $receiptContent = "Tarih/Saat:  " . date('d-m-Y H:i:s', $unixTimestamp) . "\n" .
+                      "Sipariş No:  " . $data['id'] . "\n" .
+                      "Masa      :  " . $data['table_area'] . " - " . $data['table_number'] . "\n" .
+                      "Garson    :  " . ($data['custom'] == 'y' ? 'Yazıcı Servisi' : $data['waiter_name']) . "\n\n\n" .
+                      "SİPARİŞ\n\n" .
+                      $orderNote .
+                      "_____________________________________\n" .
+                      "Miktar  Birim Fiyat  Ürün\n" .
+                      "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n";
+
+    $order = json_decode($data['order_content'], true);
+    $totalPrice = 0;
+    
+    foreach ($order as $item) {
+        $receiptContent .= "  " . $item['amount'] . "      ₺" . $item['product_price'] . ".00     " . kelimeleriFormatla($item['product_name']) . "\n";
+        $totalPrice += $item['amount'] * $item['product_price'];
+    }
+
+    $receiptContent .=
+        "_____________________________________\n" .
+        "Toplam:  ₺$totalPrice.00\n" .
+        "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n\n" .
+        "            Özgür'ün Yeri";
+
+    return $receiptContent;
+}
+
+function getPrinterList(): array {
+    // Get available printers (using Windows command)
+    exec('powershell.exe -Command "Get-Printer | Select-Object Name"', $printerOutput);
+    
+    // Skip the first two lines (header lines)
+    $printers = array_slice($printerOutput, 2);
+    
+    // Clean up printer names
+    $printerList = array_map('trim', $printers);
+    
+    return $printerList;
+}
+
+function selectPrinter(array $printers): string {
+    echo "Lütfen yazdırmak istediğiniz yazıcıyı seçin:\n";
+    foreach ($printers as $index => $printer) {
+        echo ($index + 1) . ". $printer\n";
+    }
+    
+    // Get user input
+    echo "Yazıcı numarasını girin: ";
+    $handle = fopen("php://stdin", "r");
+    $selection = trim(fgets($handle));
+    
+    // Validate selection
+    if (!is_numeric($selection) || $selection < 1 || $selection > count($printers)) {
+        die("Geçersiz yazıcı seçimi. İşlem iptal edildi.\n");
+    }
+    
+    return $printers[$selection - 1];
+}
+
+function printerExecute(int $count, string $selectedPrinter): void
+{
+    $apiKey = 'api_key';
+    $data = [
+        'api_key'     => $apiKey,
+    ];
+    $response = post('http://localhost/corder-restaurant-order-management/order-service/printer-status-update', $data);
+
+    if ($response['status_code'] == 'success') {
+        for ($i = 0; $i < $count; $i++) {
+            $command = 'powershell.exe -Command "Start-Process \'C:\compartPrinter\compart-order-' . $i . '.txt\' -WindowStyle Hidden –Verb Print -PrinterName \'' . $selectedPrinter . '\'"';
+            exec($command);
+        }
+        die('success');
+    } else {
+        die('xxxx');
+    }
+}
 
 function editFileToPrint(array $data): void
 {
@@ -69,50 +148,7 @@ function editFileToPrint(array $data): void
         }
     }
 
-    $i = 0;
-    <?php
-
-    function writeToFile($fileName, $content) {
-        $file = fopen($fileName, 'w');
-        if ($file === false) {
-            die("Unable to create file: $fileName");
-        }
-        fwrite($file, $content);
-        fclose($file);
-    }
-    
-    function formatOrderContent($data, $index) {
-        $fileName = "compart-order-$index.txt";
-        $unixTimestamp = strtotime($data['order_time']);
-        $orderNote = "NOT: " . $data['order_note'] . "\n\n";
-    
-        $receiptContent = "Tarih/Saat:  " . date('d-m-Y H:i:s', $unixTimestamp) . "\n" .
-                          "Sipariş No:  " . $data['id'] . "\n" .
-                          "Masa      :  " . $data['table_area'] . " - " . $data['table_number'] . "\n" .
-                          "Garson    :  " . ($data['custom'] == 'y' ? 'Yazıcı Servisi' : $data['waiter_name']) . "\n\n\n" .
-                          "SİPARİŞ\n\n" .
-                          $orderNote .
-                          "_____________________________________\n" .
-                          "Miktar  Birim Fiyat  Ürün\n" .
-                          "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n";
-    
-        $order = json_decode($data['order_content'], true);
-        $totalPrice = 0;
-        
-        foreach ($order as $item) {
-            $receiptContent .= "  " . $item['amount'] . "      ₺" . $item['product_price'] . ".00     " . kelimeleriFormatla($item['product_name']) . "\n";
-            $totalPrice += $item['amount'] * $item['product_price'];
-        }
-    
-        $receiptContent .=
-            "_____________________________________\n" .
-            "Toplam:  ₺$totalPrice.00\n" .
-            "‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\n\n" .
-            "            Özgür'ün Yeri";
-    
-        return $receiptContent;
-    }
-    
+    // Prepare order files
     $i = 0;
     foreach ($data as $value) {
         $receiptContent = formatOrderContent($value, $i);
@@ -120,37 +156,14 @@ function editFileToPrint(array $data): void
         writeToFile($fileName, $receiptContent);
         $i++;
     }
-    
-    ?>
-    
 
-    printerExecute(count($data));
-}
-function printerExecute(int $count): void
-{
-    $apiKey = 'api_key';
-    $data = [
-        'api_key'     => $apiKey,
-    ];
-    $response = post('http://localhost/corder-restaurant-order-management/order-service/printer-status-update', $data);
+    // Get and select printer
+    $printers = getPrinterList();
+    $selectedPrinter = selectPrinter($printers);
 
-    if ($response['status_code'] == 'success') {
-        $printerName = "Microsoft Print to PDF"; // Kullanmak istediğin yazıcıyı buraya yaz.
-
-        for ($i = 0; $i < $count; $i++) {
-            $filePath = "C:\\compartPrinter\\compart-order-$i.txt";
-
-            // PowerShell ile belirli bir yazıcıya yazdırma komutu
-            $command = 'powershell.exe -Command "& {Start-Process -FilePath \'' . $filePath . '\' -ArgumentList \'/p /h\', \'' . $printerName . '\' -NoNewWindow -PassThru}"';
-
-            exec($command);
-        }
-        die('success');
-    } else {
-        die('xxxx');
-    }
+    // Print with selected printer
+    printerExecute(count($data), $selectedPrinter);
 }
 
-
-
+// Execute the main function
 editFileToPrint(compartOrderControlApi('http://localhost/corder-restaurant-order-management/order-service/last-order'));
