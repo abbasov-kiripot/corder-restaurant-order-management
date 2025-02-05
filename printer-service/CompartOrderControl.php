@@ -126,7 +126,6 @@ function editFileToPrint(array $data): void
 
     printerExecute(count($data));
 }
-
 function printerExecute(int $count): void
 {
     $apiKey = 'api_key';
@@ -136,8 +135,14 @@ function printerExecute(int $count): void
     $response = post('http://localhost/corder-restaurant-order-management/order-service/printer-status-update', $data);
 
     if ($response['status_code'] == 'success') {
+        $printerName = "Microsoft Print to PDF"; // Kullanmak istediğin yazıcıyı buraya yaz.
+
         for ($i = 0; $i < $count; $i++) {
-            $command = 'powershell.exe -Command "Start-Process \'C:\compartPrinter\compart-order-' . $i . '.txt\' -WindowStyle Hidden –Verb Print"';
+            $filePath = "C:\\compartPrinter\\compart-order-$i.txt";
+
+            // PowerShell ile belirli bir yazıcıya yazdırma komutu
+            $command = 'powershell.exe -Command "& {Start-Process -FilePath \'' . $filePath . '\' -ArgumentList \'/p /h\', \'' . $printerName . '\' -NoNewWindow -PassThru}"';
+
             exec($command);
         }
         die('success');
@@ -145,6 +150,7 @@ function printerExecute(int $count): void
         die('xxxx');
     }
 }
+
 
 
 editFileToPrint(compartOrderControlApi('http://localhost/corder-restaurant-order-management/order-service/last-order'));

@@ -496,7 +496,7 @@
 
             </p>
 
-            <code id="selected-table-total-amount">Hesab ##</code>
+            <code id="selected-table-total-amount">Hesab ₼##</code>
 
         </div>
 

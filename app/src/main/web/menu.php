@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="tr">
+<html lang="az">
 
 
 
@@ -34,7 +34,7 @@
 
         <!-- <div class="bars-icon"><i class="fa-solid fa-bars"></i>&nbsp;Menü&nbsp;</div> -->
 
-        <img loading="lazy" class="logo" src="./public/images/ui/logo.jpg" />
+        <img loading="lazy" class="logo" src="./public/images/ui/logo-1.jpg" />
 
         <div style="position: absolute;left:15px;" class="back-icon">Masa: <?= $_GET['table'] ?></div>
 
